@@ -4,9 +4,22 @@ import { GeistMono } from 'geist/font/mono'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.dev',
+  title: 'wegbrait.com — wegbrait.com',
+  description: 'wegbrait.com is wegbrait.com.',
+  metadataBase: new URL('https://wegbrait.com'),
+  openGraph: {
+    title: 'wegbrait.com',
+    description: 'wegbrait.com is wegbrait.com.',
+    url: 'https://wegbrait.com',
+    siteName: 'wegbrait.com',
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'wegbrait.com',
+    description: 'wegbrait.com is wegbrait.com.',
+  },
 }
 
 export default function RootLayout({

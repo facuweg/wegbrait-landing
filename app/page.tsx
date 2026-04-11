@@ -289,14 +289,6 @@ export default function Page() {
           <div style={{ opacity: decorOpacity, transition: 'opacity 0.1s' }}>
             <div style={{ height: '1px', background: 'rgba(255,255,255,0.07)', marginTop: '0.5rem' }} />
             <div style={{
-              fontFamily: 'monospace', fontSize: 'clamp(6px, 0.72vw, 9px)',
-              color: 'rgba(255,255,255,0.2)', letterSpacing: '0.4em',
-              textAlign: 'center', marginTop: '1.4rem',
-              animation: 'flicker 8s ease-in-out infinite',
-            }}>
-              {'> COMING SOON'}<span style={{ opacity: cursor ? 1 : 0 }}>_</span>
-            </div>
-            <div style={{
               fontFamily: 'monospace', fontSize: 'clamp(5px, 0.6vw, 7px)',
               color: 'rgba(255,255,255,0.1)', letterSpacing: '0.5em',
               textAlign: 'center', marginTop: '0.5rem',
