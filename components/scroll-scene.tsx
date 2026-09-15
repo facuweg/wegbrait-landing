@@ -195,7 +195,7 @@ uniform float uOpacity;
 varying float vFade;
 varying float vHeight;
 void main() {
-  float bright = 0.35 + 0.65 * smoothstep(-4.0, 6.0, vHeight);
+  float bright = 0.3 + 0.5 * smoothstep(-4.0, 6.0, vHeight);
   gl_FragColor = vec4(vec3(bright), vFade * uOpacity);
 }
 `
@@ -418,7 +418,7 @@ export default function ScrollScene() {
       // Halo: (radius, angle, height jitter) of a disc / iris around the core,
       // dense at the inner rim and thinning outward.
       const ring = rand()
-      halo[i * 3] = 7.4 + Math.pow(ring, 0.6) * 2.4 + (rand() - 0.5) * 0.3
+      halo[i * 3] = 7.9 + Math.pow(ring, 0.6) * 2.2 + (rand() - 0.5) * 0.3
       halo[i * 3 + 1] = rand() * Math.PI * 2
       halo[i * 3 + 2] = (rand() - 0.5) * 0.5
       rands[i] = rand()
@@ -439,7 +439,7 @@ export default function ScrollScene() {
         uMorphB: { value: 0 },
         uSize: { value: (isMobile ? 1.8 : 2.1) * dpr },
         uTextScale: { value: 1 },
-        uHaloAlpha: { value: isMobile ? 0.17 : 0.42 },
+        uHaloAlpha: { value: isMobile ? 0.27 : 0.42 },
         uHaloSize: { value: isMobile ? 1.3 : 1.1 },
         uMaxSize: { value: 4.5 * dpr },
         uHaloScale: { value: 1 },
@@ -512,7 +512,7 @@ export default function ScrollScene() {
     const ringSpecs = [
       { r: 9.2, tilt: [0.9, 0.2, 0] },
       { r: 11.2, tilt: [-0.5, 1.1, 0.3] },
-      { r: 13.6, tilt: [0.3, -0.7, 1.2] },
+      { r: 12.2, tilt: [0.3, -0.7, 1.2] },
     ]
     for (const spec of ringSpecs) {
       const pts: THREE.Vector3[] = []
@@ -584,8 +584,8 @@ export default function ScrollScene() {
       // Closing halo must fit inside the short axis of the viewport.
       const finalDist = 30 * orbitScale
       const pxPerUnit = (h / 2) / (finalDist * Math.tan((camera.fov * Math.PI) / 360))
-      const haloMaxUnits = 9.8
-      pMat.uniforms.uHaloScale.value = Math.min(1.05, Math.max(0.6, (0.4 * Math.min(w, h)) / (haloMaxUnits * pxPerUnit)))
+      const haloMaxUnits = 10.1
+      pMat.uniforms.uHaloScale.value = Math.min(1.05, Math.max(0.6, (0.42 * Math.min(w, h)) / (haloMaxUnits * pxPerUnit)))
       readScroll()
     }
 
@@ -599,7 +599,8 @@ export default function ScrollScene() {
       } else if (p < 0.62) {
         const t = (p - 0.4) / 0.22
         const e = t * t * (3 - 2 * t)
-        pos.set(Math.sin(t * Math.PI) * 4, 1.5 + 2.5 * e, 6 - (46 + 6 * (orbitScale - 1) * 5) * e)
+        const orbitStartZ = CORE.z + 30 * orbitScale
+        pos.set(Math.sin(t * Math.PI) * 4, 1.5 + 2.5 * e, 6 + (orbitStartZ - 6) * e)
         look.copy(CORE)
       } else {
         const t = smooth(0.62, 0.96, p)
@@ -771,10 +772,10 @@ export default function ScrollScene() {
         </div>
 
         {/* HUD */}
-        <div className="ws-corner ws-tl">┌──</div>
-        <div className="ws-corner ws-tr">──┐</div>
-        <div className="ws-corner ws-bl">└──</div>
-        <div className="ws-corner ws-br">──┘</div>
+        <div className="ws-corner ws-tl" />
+        <div className="ws-corner ws-tr" />
+        <div className="ws-corner ws-bl" />
+        <div className="ws-corner ws-br" />
         <div className="ws-version">WEGBRAIT.COM<br />v0.1.0-alpha</div>
         <div ref={readoutRef} className="ws-readout">X:0.0 Y:0.0 Z:30.0  T:000%</div>
         <div className="ws-bar"><div ref={barRef} className="ws-bar-fill" /></div>
@@ -811,7 +812,7 @@ export default function ScrollScene() {
           margin-top: 14px;
           font-family: var(--ws-mono, ui-monospace, monospace);
           font-size: clamp(7px, 0.7vw, 9px); letter-spacing: 0.4em;
-          color: rgba(255,255,255,0.6);
+          color: rgba(255,255,255,0.7);
           animation: ws-blink 2.4s ease-in-out infinite;
         }
         @keyframes ws-blink { 0%,100% { opacity: 0.55 } 50% { opacity: 1 } }
@@ -830,8 +831,8 @@ export default function ScrollScene() {
         .ws-dia { font-size: 0.7em; vertical-align: 1px; }
         .ws-kicker {
           font-family: var(--ws-mono, ui-monospace, monospace);
-          font-size: 10px; letter-spacing: 0.4em; color: rgba(255,255,255,0.45);
-          margin-bottom: 18px;
+          font-size: 10px; letter-spacing: 0.4em; color: rgba(255,255,255,0.7);
+          margin-bottom: 18px; text-shadow: 0 0 6px #000, 0 0 6px #000, 0 0 2px #000;
         }
         .ws-title {
           margin: 0; font-weight: 600; letter-spacing: -0.03em; line-height: 1.02;
@@ -851,29 +852,30 @@ export default function ScrollScene() {
         .ws-final .ws-hint { color: rgba(255,255,255,0.7); animation: none; text-shadow: 0 0 8px #000, 0 0 3px #000; }
         .ws-wordmark {
           margin: 0; font-weight: 800; letter-spacing: -0.05em; line-height: 0.95;
-          font-size: clamp(44px, 9.5vw, 150px); color: #fff;
+          font-size: clamp(44px, 8.8vw, 140px); color: #fff;
           text-shadow: 0 0 60px rgba(0,0,0,1), 0 0 20px rgba(0,0,0,1);
         }
         .ws-wordmark span { color: rgba(255,255,255,0.5); }
 
         .ws-corner {
-          position: absolute; font-family: var(--ws-mono, ui-monospace, monospace);
-          font-size: 12px; color: rgba(255,255,255,0.6); line-height: 1; letter-spacing: 0.05em;
-          pointer-events: none; text-shadow: 0 0 6px #000, 0 0 2px #000;
+          position: absolute; width: 18px; height: 12px; pointer-events: none;
+          border: 0 solid rgba(255,255,255,0.55);
         }
-        .ws-tl { top: 22px; left: 22px } .ws-tr { top: 22px; right: 22px }
-        .ws-bl { bottom: 22px; left: 22px } .ws-br { bottom: 22px; right: 22px }
+        .ws-tl { top: 22px; left: 22px; border-top-width: 1px; border-left-width: 1px }
+        .ws-tr { top: 22px; right: 22px; border-top-width: 1px; border-right-width: 1px }
+        .ws-bl { bottom: 22px; left: 22px; border-bottom-width: 1px; border-left-width: 1px }
+        .ws-br { bottom: 22px; right: 22px; border-bottom-width: 1px; border-right-width: 1px }
         .ws-version {
           position: absolute; top: 40px; right: 22px; text-align: right;
           font-family: var(--ws-mono, ui-monospace, monospace);
-          font-size: 10px; letter-spacing: 0.18em; color: rgba(255,255,255,0.6); pointer-events: none;
-          text-shadow: 0 0 6px #000, 0 0 2px #000;
+          font-size: 10px; letter-spacing: 0.18em; color: rgba(255,255,255,0.65); pointer-events: none;
+          text-shadow: 0 0 6px #000, 0 0 6px #000, 0 0 2px #000, 0 0 2px #000;
         }
         .ws-readout {
           position: absolute; bottom: 40px; left: 22px; white-space: pre;
           font-family: var(--ws-mono, ui-monospace, monospace);
-          font-size: 10px; letter-spacing: 0.18em; color: rgba(255,255,255,0.6); pointer-events: none;
-          text-shadow: 0 0 6px #000, 0 0 2px #000;
+          font-size: 10px; letter-spacing: 0.18em; color: rgba(255,255,255,0.65); pointer-events: none;
+          text-shadow: 0 0 6px #000, 0 0 6px #000, 0 0 2px #000, 0 0 2px #000;
         }
         .ws-bar {
           position: absolute; left: 0; right: 0; bottom: 0; height: 2px; z-index: 5;
@@ -888,6 +890,7 @@ export default function ScrollScene() {
           .ws-chapter { left: 24px; right: 24px; max-width: none; top: auto; bottom: 9vh; transform: none; }
           .ws-chapter::before { inset: -70px -24px -12vh -24px; background: linear-gradient(to top, rgba(0,0,0,0.95) 55%, rgba(0,0,0,0)); }
           .ws-version, .ws-readout { display: none; }
+          .ws-final .ws-hint { font-size: 9px; letter-spacing: 0.12em; }
         }
         @media (prefers-reduced-motion: reduce) {
           .ws-hint { animation: none; }
