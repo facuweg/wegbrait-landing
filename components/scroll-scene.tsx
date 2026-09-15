@@ -81,6 +81,8 @@ uniform float uSize;
 uniform float uTextScale;
 uniform mat3 uHaloMat;
 uniform float uHaloAlpha;
+uniform float uHaloSize;
+uniform float uMaxSize;
 attribute vec3 aText;
 attribute vec3 aScatter;
 attribute vec3 aHalo;
@@ -91,7 +93,9 @@ varying float vRand;
 void main() {
   vRand = aRand;
   // Staggered morph so letters peel off instead of popping.
-  float mA = smoothstep(0.0, 1.0, (uMorphA * 1.6 - aRand * 0.6));
+  // Letters peel off left to right, with a little per-particle jitter.
+  float letterDelay = clamp(aText.x / 21.0 + 0.5, 0.0, 1.0);
+  float mA = smoothstep(0.0, 1.0, (uMorphA * 1.9 - letterDelay * 0.7 - aRand * 0.2));
   float mB = smoothstep(0.0, 1.0, (uMorphB * 1.5 - aRand * 0.5));
 
   vec3 textPos = aText * vec3(uTextScale, uTextScale, 1.0);
@@ -117,14 +121,16 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   float dist = -mv.z;
   float size = uSize * (0.6 + aRand * 0.8) * (26.0 / max(dist, 1.0));
-  size *= mix(1.0, 1.35, mA);
-  size *= mix(1.0, 1.15, mB);
-  gl_PointSize = clamp(size, 1.0, 9.0);
+  size *= mix(1.0, 1.25, mA);
+  size *= mix(1.0, uHaloSize, mB);
+  gl_PointSize = clamp(size, 1.0, uMaxSize);
   gl_Position = projectionMatrix * mv;
 
-  float fog = smoothstep(120.0, 8.0, dist);
-  float base = mix(0.42, 0.7, mA);
+  float fog = smoothstep(100.0, 6.0, dist);
+  float base = mix(0.42, 0.5, mA);
   base = mix(base, uHaloAlpha, mB);
+  // Dim while the dust is in transit to the halo so it never blankets the frame.
+  base *= 1.0 - 0.55 * sin(mB * 3.14159);
   vAlpha = base * fog * (0.5 + 0.5 * aRand);
 }
 `
@@ -136,9 +142,9 @@ void main() {
   vec2 c = gl_PointCoord - 0.5;
   float d = dot(c, c);
   if (d > 0.25) discard;
-  float soft = smoothstep(0.25, 0.02, d);
-  float core = smoothstep(0.08, 0.0, d);
-  float a = (soft * 0.6 + core * 0.8) * vAlpha;
+  float soft = smoothstep(0.25, 0.10, d);
+  float core = smoothstep(0.06, 0.0, d);
+  float a = (soft * 0.7 + core * 0.6) * vAlpha;
   gl_FragColor = vec4(vec3(1.0), a);
 }
 `
@@ -172,7 +178,7 @@ void main() {
   vHeight = h;
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   float dist = -mv.z;
-  float fog = smoothstep(140.0, 10.0, dist);
+  float fog = smoothstep(140.0, 10.0, dist) * smoothstep(2.0, 16.0, dist);
   float edge = smoothstep(120.0, 60.0, abs(position.x)) * smoothstep(120.0, 70.0, abs(position.z));
   vFade = fog * edge;
   gl_Position = projectionMatrix * mv;
@@ -236,13 +242,15 @@ const MonoShader = {
       l = pow(max(l, 0.0), 1.15);
       // Film grain
       float g = hash(gl_FragCoord.xy + fract(uTime) * 100.0) - 0.5;
-      l += g * uGrain * (0.3 + l);
+      l += g * uGrain * (0.05 + l);
+      l = max(l - 0.012, 0.0);
       // Ordered dither to a few levels, blended with the smooth value.
       // Fully white pixels (wireframe lines) are left untouched.
       float levels = 6.0;
       float t = bayer8(gl_FragCoord.xy);
       float q = floor(l * levels + t) / levels;
-      float o = mix(l, q, uDither * (1.0 - smoothstep(0.85, 1.0, l)));
+      float gate = smoothstep(0.02, 0.09, l) * (1.0 - smoothstep(0.85, 1.0, l));
+      float o = mix(l, q, uDither * gate);
       // Vignette (after quantisation so it never breaks lines into dashes)
       vec2 d = vUv - 0.5;
       o *= 1.0 - dot(d, d) * 0.9;
@@ -405,7 +413,7 @@ export default function ScrollScene() {
       // Halo: (radius, angle, height jitter) of a disc / iris around the core,
       // dense at the inner rim and thinning outward.
       const ring = rand()
-      halo[i * 3] = 7.4 + Math.pow(ring, 0.45) * 3.6 + (rand() - 0.5) * 0.5
+      halo[i * 3] = 7.0 + Math.pow(ring, 0.45) * 2.8 + (rand() - 0.5) * 0.5
       halo[i * 3 + 1] = rand() * Math.PI * 2
       halo[i * 3 + 2] = (rand() - 0.5) * 0.5
       rands[i] = rand()
@@ -426,7 +434,9 @@ export default function ScrollScene() {
         uMorphB: { value: 0 },
         uSize: { value: (isMobile ? 1.8 : 2.1) * dpr },
         uTextScale: { value: 1 },
-        uHaloAlpha: { value: isMobile ? 0.9 : 0.38 },
+        uHaloAlpha: { value: isMobile ? 0.5 : 0.3 },
+        uHaloSize: { value: isMobile ? 1.3 : 1.1 },
+        uMaxSize: { value: 4.5 * dpr },
         uHaloMat: { value: new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI * 0.44)) },
       },
       transparent: true,
@@ -464,7 +474,8 @@ export default function ScrollScene() {
       depthWrite: false,
     })
     const terrain = new THREE.LineSegments(tGeo, tMat)
-    terrain.position.set(0, TERRAIN_Y, -40)
+    terrain.position.set(240 / (isMobile ? 70 : 110) / 2, TERRAIN_Y, -40)
+    terrain.rotation.y = 0.035
     terrain.frustumCulled = false
     scene.add(terrain)
 
@@ -472,9 +483,15 @@ export default function ScrollScene() {
     const mono = new THREE.Group()
     mono.position.copy(CORE)
     const icoGeo = new THREE.IcosahedronGeometry(6.5, 1)
-    const icoFill = new THREE.Mesh(icoGeo, new THREE.MeshBasicMaterial({ color: 0x000000 }))
+    const icoFill = new THREE.Mesh(icoGeo, new THREE.MeshBasicMaterial({ color: 0x000000, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 }))
     const icoEdgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 })
-    const icoEdges = new THREE.LineSegments(new THREE.EdgesGeometry(icoGeo, 1), icoEdgeMat)
+    const icoEdgeGeo = new THREE.EdgesGeometry(icoGeo, 1)
+    const icoEdges = new THREE.LineSegments(icoEdgeGeo, icoEdgeMat)
+    // Hidden edges drawn intentionally dashed, behind the solid ones.
+    const icoBackMat = new THREE.LineDashedMaterial({ color: 0xffffff, transparent: true, opacity: 0, dashSize: 0.45, gapSize: 0.35, depthTest: false })
+    const icoBack = new THREE.LineSegments(icoEdgeGeo, icoBackMat)
+    icoBack.computeLineDistances()
+    icoBack.renderOrder = -1
     const innerGeo = new THREE.IcosahedronGeometry(3.2, 0)
     const innerMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 })
     const inner = new THREE.Mesh(innerGeo, innerMat)
@@ -482,14 +499,14 @@ export default function ScrollScene() {
       new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(3.25, 0)),
       new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }),
     )
-    mono.add(icoFill, icoEdges, inner, innerEdges)
+    mono.add(icoBack, icoFill, icoEdges, inner, innerEdges)
 
     const ringMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 })
     const rings: THREE.Line[] = []
     const ringSpecs = [
-      { r: 10.5, tilt: [0.9, 0.2, 0] },
-      { r: 13.5, tilt: [-0.5, 1.1, 0.3] },
-      { r: 16.5, tilt: [0.3, -0.7, 1.2] },
+      { r: 9.2, tilt: [0.9, 0.2, 0] },
+      { r: 11.2, tilt: [-0.5, 1.1, 0.3] },
+      { r: 13.6, tilt: [0.3, -0.7, 1.2] },
     ]
     for (const spec of ringSpecs) {
       const pts: THREE.Vector3[] = []
@@ -572,10 +589,15 @@ export default function ScrollScene() {
       } else {
         const t = smooth(0.62, 0.96, p)
         const ang = t * Math.PI * 2
-        const R = (24 - 9 * Math.sin(t * Math.PI)) * orbitScale
+        const R = (24 - 6 * Math.sin(t * Math.PI)) * orbitScale
         pos.set(CORE.x + Math.sin(ang) * R, 4 + 4 * Math.sin(t * Math.PI), CORE.z + Math.cos(ang) * R)
         look.copy(CORE)
       }
+    }
+
+    const chapterVis = (id: string, p: number) => {
+      const ch = CHAPTERS.find(c => c.id === id)!
+      return smooth(ch.start, ch.start + 0.06, p) * (1 - smooth(ch.end - 0.06, ch.end, p))
     }
 
     const setOpacity = (el: HTMLElement | null, v: number, y = 0) => {
@@ -606,6 +628,10 @@ export default function ScrollScene() {
       camera.position.copy(camPos)
       lookSmooth.lerp(camLook, k)
       camera.lookAt(lookSmooth)
+      // While chapter copy is on screen, nudge the subject away from it.
+      const copyVis = Math.max(chapterVis('c2', p), chapterVis('c3', p))
+      if (isMobile) camera.rotateX(-0.11 * copyVis)
+      else camera.rotateY(0.15 * copyVis)
       camera.rotation.z += Math.sin(elapsed * 0.3) * 0.004
 
       // Particles
@@ -625,9 +651,10 @@ export default function ScrollScene() {
       const monoIn = smooth(0.34, 0.6, p)
       const coreIn = smooth(0.62, 0.78, p)
       icoEdgeMat.opacity = monoIn * 0.9
+      icoBackMat.opacity = monoIn * 0.3
       innerMat.opacity = coreIn * (0.55 + 0.25 * Math.sin(elapsed * 2.1))
       ;(innerEdges.material as THREE.LineBasicMaterial).opacity = coreIn
-      ringMat.opacity = monoIn * 0.55
+      ringMat.opacity = monoIn * (0.55 + 0.4 * coreIn)
       mono.rotation.y = elapsed * 0.12
       mono.rotation.x = Math.sin(elapsed * 0.17) * 0.15
       inner.rotation.y = -elapsed * 0.5
@@ -644,7 +671,7 @@ export default function ScrollScene() {
       bloom.strength = (isMobile ? 0.55 : 0.7) + 0.35 * smooth(0.86, 1, p)
 
       // Overlay
-      setOpacity(heroRef.current, 1 - smooth(0.02, 0.12, p), -smooth(0, 0.12, p) * 30)
+      setOpacity(heroRef.current, 1 - smooth(0.1, 0.17, p), -smooth(0.08, 0.17, p) * 30)
       for (const ch of CHAPTERS) {
         const el = chapterRefs.current[ch.id]
         const fadeIn = smooth(ch.start, ch.start + 0.06, p)
@@ -680,6 +707,7 @@ export default function ScrollScene() {
       tGeo.dispose()
       tMat.dispose()
       icoGeo.dispose()
+      icoEdgeGeo.dispose()
       innerGeo.dispose()
       rings.forEach(r => r.geometry.dispose())
       renderer.dispose()
@@ -698,7 +726,7 @@ export default function ScrollScene() {
 
         {/* Hero copy */}
         <div ref={heroRef} className="ws-hero">
-          <div className="ws-label">◆ &nbsp; W E G B R A I T . C O M &nbsp; ◆</div>
+          <div className="ws-label"><span className="ws-dia">◆</span> &nbsp; W E G B R A I T . C O M &nbsp; <span className="ws-dia">◆</span></div>
           <div className="ws-hint">[ SCROLL ]</div>
         </div>
 
@@ -771,8 +799,15 @@ export default function ScrollScene() {
         .ws-chapter {
           position: absolute; left: clamp(24px, 8vw, 140px); top: 50%;
           max-width: min(520px, 80vw); transform: translateY(-50%);
-          pointer-events: none; will-change: opacity, transform;
+          pointer-events: none; will-change: opacity, transform; z-index: 2;
         }
+        .ws-chapter::before, .ws-final::before {
+          content: ''; position: absolute; z-index: -1; pointer-events: none;
+          inset: -90px -140px;
+          background: radial-gradient(ellipse at 45% 50%, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0) 72%);
+        }
+        .ws-final::before { inset: 30% 20%; background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 45%, rgba(0,0,0,0) 72%); }
+        .ws-dia { font-size: 0.7em; vertical-align: 1px; }
         .ws-kicker {
           font-family: var(--ws-mono, ui-monospace, monospace);
           font-size: 10px; letter-spacing: 0.4em; color: rgba(255,255,255,0.45);
@@ -785,14 +820,15 @@ export default function ScrollScene() {
         }
         .ws-body {
           margin: 18px 0 0; font-size: clamp(14px, 1.2vw, 17px); line-height: 1.5;
-          color: rgba(255,255,255,0.6); max-width: 420px;
+          color: rgba(255,255,255,0.72); max-width: 420px;
           text-shadow: 0 0 30px rgba(0,0,0,0.9);
         }
 
         .ws-final {
           position: absolute; inset: 0; display: flex; flex-direction: column;
-          align-items: center; justify-content: center; text-align: center; pointer-events: none;
+          align-items: center; justify-content: center; text-align: center; pointer-events: none; z-index: 2;
         }
+        .ws-final .ws-hint { color: rgba(255,255,255,0.6); }
         .ws-wordmark {
           margin: 0; font-weight: 800; letter-spacing: -0.05em; line-height: 0.95;
           font-size: clamp(44px, 11vw, 168px); color: #fff;
@@ -802,20 +838,22 @@ export default function ScrollScene() {
 
         .ws-corner {
           position: absolute; font-family: var(--ws-mono, ui-monospace, monospace);
-          font-size: 12px; color: rgba(255,255,255,0.28); line-height: 1; letter-spacing: 0.05em;
-          pointer-events: none;
+          font-size: 12px; color: rgba(255,255,255,0.45); line-height: 1; letter-spacing: 0.05em;
+          pointer-events: none; text-shadow: 0 0 6px #000, 0 0 2px #000;
         }
         .ws-tl { top: 22px; left: 22px } .ws-tr { top: 22px; right: 22px }
         .ws-bl { bottom: 22px; left: 22px } .ws-br { bottom: 22px; right: 22px }
         .ws-version {
           position: absolute; top: 40px; right: 22px; text-align: right;
           font-family: var(--ws-mono, ui-monospace, monospace);
-          font-size: 8px; letter-spacing: 0.18em; color: rgba(255,255,255,0.32); pointer-events: none;
+          font-size: 8px; letter-spacing: 0.18em; color: rgba(255,255,255,0.55); pointer-events: none;
+          text-shadow: 0 0 6px #000, 0 0 2px #000;
         }
         .ws-readout {
           position: absolute; bottom: 40px; left: 22px; white-space: pre;
           font-family: var(--ws-mono, ui-monospace, monospace);
-          font-size: 8px; letter-spacing: 0.18em; color: rgba(255,255,255,0.32); pointer-events: none;
+          font-size: 8px; letter-spacing: 0.18em; color: rgba(255,255,255,0.55); pointer-events: none;
+          text-shadow: 0 0 6px #000, 0 0 2px #000;
         }
         .ws-bar {
           position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
@@ -827,7 +865,8 @@ export default function ScrollScene() {
         }
 
         @media (max-width: 767px) {
-          .ws-chapter { left: 24px; right: 24px; max-width: none; }
+          .ws-chapter { left: 24px; right: 24px; max-width: none; top: auto; bottom: 9vh; transform: none; }
+          .ws-chapter::before { inset: -60px -40px; }
           .ws-version, .ws-readout { display: none; }
         }
         @media (prefers-reduced-motion: reduce) {
